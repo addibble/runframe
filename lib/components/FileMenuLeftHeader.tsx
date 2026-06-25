@@ -44,6 +44,11 @@ import {
   type LbrnExportOptions,
 } from "./LbrnExportOptionsDialog"
 import { exportLbrn } from "lib/optional-features/exporting/formats/export-lbrn"
+import {
+  getEnclosureParts,
+  exportEnclosurePartStl,
+  exportAllEnclosureStls,
+} from "lib/optional-features/exporting/formats/export-enclosure"
 import { getLatestAutoroutingLogEntry } from "lib/utils/get-latest-autorouting-log-entry"
 
 export const FileMenuLeftHeader = (props: {
@@ -173,6 +178,19 @@ export const FileMenuLeftHeader = (props: {
 
   const storeCircuitJson = useRunFrameStore((state) => state.circuitJson)
   const circuitJson = storeCircuitJson ?? props.circuitJson
+  const enclosureParts = useMemo(
+    () => (circuitJson ? getEnclosureParts(circuitJson) : []),
+    [circuitJson],
+  )
+  const resolveProjectName = () => {
+    let projectNameFromPath = "Untitled"
+    if (currentMainComponentPath) {
+      const filename = currentMainComponentPath.split("/").pop()
+      if (filename) projectNameFromPath = filename.replace(/\.[^.]+$/, "")
+    }
+    const name = props.projectName ?? snippetName ?? projectNameFromPath
+    return (name || "Untitled").replace(/\.(board|circuit)$/, "")
+  }
 
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [isAiReviewDialogOpen, setIsAiReviewDialogOpen] = useState(false)
@@ -375,6 +393,57 @@ export const FileMenuLeftHeader = (props: {
                       <span className="rf-text-xs">{exp.name}</span>
                     </DropdownMenuItem>
                   ))}
+                  {enclosureParts.length > 0 && (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="rf-text-xs">
+                        Enclosure
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          {enclosureParts.map((part) => (
+                            <DropdownMenuItem
+                              key={part.partId}
+                              disabled={isExporting}
+                              onSelect={() => {
+                                if (!circuitJson) {
+                                  toast.error("No Circuit JSON to export")
+                                  return
+                                }
+                                exportEnclosurePartStl({
+                                  circuitJson,
+                                  projectName: resolveProjectName(),
+                                  partId: part.partId,
+                                })
+                              }}
+                            >
+                              <span className="rf-text-xs">
+                                {part.name} (STL)
+                              </span>
+                            </DropdownMenuItem>
+                          ))}
+                          {enclosureParts.length > 1 && (
+                            <DropdownMenuItem
+                              disabled={isExporting}
+                              onSelect={() => {
+                                if (!circuitJson) {
+                                  toast.error("No Circuit JSON to export")
+                                  return
+                                }
+                                exportAllEnclosureStls({
+                                  circuitJson,
+                                  projectName: resolveProjectName(),
+                                })
+                              }}
+                            >
+                              <span className="rf-text-xs">
+                                All Parts (STL .zip)
+                              </span>
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                  )}
                 </DropdownMenuSubContent>
               </DropdownMenuPortal>
             </DropdownMenuSub>
